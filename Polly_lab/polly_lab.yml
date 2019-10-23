@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template creates poly for the acloud guru lab
+
+Resources:
+  posts:
+    Type: 'AWS::DynamoDB::Table'
+    Properties: 
+        AttributeDefinitions:
+        -   AttributeName: Id
+            AttributeType: S
+        TableName: posts
+        ProvisionedThroughput:
+          WriteCapacityUnits: "5"
+          ReadCapacityUnits:  "5"
+        KeySchema:
+        -   AttributeName: Id
+            KeyType: HASH
+        
+  holygrailwebsite:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      AccessControl: PublicRead
+      BucketName: holygrailwebsite
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+  holygrailmp3pubbucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      AccessControl: PublicRead
+      BucketName: holygrailmp3pubbucket
+  newposts:
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      DisplayName: newposts
+      TopicName: new_posts
+        
+  Lambdaroleforpolly:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service: 'lambda.amazonaws.com'
+          Action: 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+      - PolicyName: "Lambdapolicyforpolly"
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: "Allow"
+            Action:
+            - 'polly:SynthesizeSpeech'
+            - 'dynamodb:Query'
+            - 'dynamodb:Scan'
+            - 'dynamodb:PutItem'
+            - 'dynamodb:UpdateItem'
+            - 'sns:Publish'
+            - 's3:PutObject'
+            - 's3:PutObjectAcl'
+            - 's3:GetBucketLocation'
+            - 'logs:CreateLogGroup'
+            - 'logs:CreateLogStream'
+            - 'logs:PutLogEvents'
+            Resource: '*'
+      

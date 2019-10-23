@@ -1,0 +1,282 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "This template creates a VPC with 2 private subnet and 2 public subnet.
+Creates IGW, NAT gateway & Bootstraps EC2 instance"
+
+Resources:
+  vpc06df7387e74ce73d7:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      InstanceTenancy: default
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'false'
+      Tags:
+        - Key: Name
+          Value: Prod
+  subnet04c0ddd3224f5f7ac:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: us-east-1a
+      VpcId: !Ref vpc06df7387e74ce73d7
+      Tags:
+        - Key: Name
+          Value: Private-useast1a
+  subnet076ea0211f91efde3:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: us-east-1a
+      VpcId: !Ref vpc06df7387e74ce73d7
+      Tags:
+        - Key: Name
+          Value: Public-useast1a
+  subnet02eea377d784af8a9:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: us-east-1b
+      VpcId: !Ref vpc06df7387e74ce73d7
+      Tags:
+        - Key: Name
+          Value: Private-useast1b
+  subnet089aad5aa0d8ffc2b:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: 10.0.4.0/24
+      AvailabilityZone: us-east-1b
+      VpcId: !Ref vpc06df7387e74ce73d7
+      Tags:
+        - Key: Name
+          Value: public-useast1b
+  igw00318af932fad3ea8:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: Prod-VPC-IgW
+  dopt967a43ed:
+    Type: 'AWS::EC2::DHCPOptions'
+    Properties:
+      DomainName: ec2.internal
+      DomainNameServers:
+        - AmazonProvidedDNS
+  acl0df19ae50470a7fc5:
+    Type: 'AWS::EC2::NetworkAcl'
+    Properties:
+      VpcId: !Ref vpc06df7387e74ce73d7
+  rtb096cf3dc40867e479:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref vpc06df7387e74ce73d7
+      Tags:
+        - Key: Name
+          Value: Public-RT
+  rtb0d9c64c57f9680ea5:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref vpc06df7387e74ce73d7
+  eip18205193250:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+  asgASGEC2:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      AvailabilityZones:
+        - us-east-1a
+        - us-east-1b
+      Cooldown: '300'
+      DesiredCapacity: '2'
+      HealthCheckGracePeriod: '300'
+      HealthCheckType: EC2
+      MaxSize: '2'
+      MinSize: '2'
+      VPCZoneIdentifier:
+        - !Ref subnet04c0ddd3224f5f7ac
+        - !Ref subnet02eea377d784af8a9
+      LaunchConfigurationName: !Ref lcLCEC2
+      TerminationPolicies:
+        - Default
+  lcLCEC2:
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Properties:
+      ImageId: ami-0b898040803850657
+      InstanceType: t2.micro
+      KeyName: public_key
+      SecurityGroups:
+        - !Ref sgVPCWebSG
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            SnapshotId: snap-08091107f3acb12b2
+            VolumeSize: 8
+  topicDefaultCloudWatchAlarmsTopic:
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      DisplayName: Default_CloudWatch_Alarms_Topic
+      Subscription:
+         Endpoint: *.******@gmail.com
+          Protocol: email
+  sgVPCWebSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Default
+      VpcId: !Ref vpc06df7387e74ce73d7
+  sgVPCELB:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Subnetfor ELB
+      VpcId: !Ref vpc06df7387e74ce73d7
+  snspolicyDefaultCloudWatchAlarmsTopic:
+    Type: 'AWS::SNS::TopicPolicy'
+    Properties:
+      Topics:
+        - !Ref topicDefaultCloudWatchAlarmsTopic
+      PolicyDocument:
+        Version: 2008-10-17
+        Id: __default_policy_ID
+        Statement:
+          - Sid: __default_statement_ID
+            Effect: Allow
+            Principal:
+              AWS: '*'
+            Action:
+              - 'SNS:GetTopicAttributes'
+              - 'SNS:SetTopicAttributes'
+              - 'SNS:AddPermission'
+              - 'SNS:RemovePermission'
+              - 'SNS:DeleteTopic'
+              - 'SNS:Subscribe'
+              - 'SNS:ListSubscriptionsByTopic'
+              - 'SNS:Publish'
+              - 'SNS:Receive'
+            Resource: !Ref topicDefaultCloudWatchAlarmsTopic
+            Condition:
+              StringEquals:
+                'AWS:SourceOwner': '870923552731'
+  acl1:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: 'true'
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId: !Ref acl0df19ae50470a7fc5
+  acl2:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId: !Ref acl0df19ae50470a7fc5
+  subnetacl1:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      NetworkAclId: !Ref acl0df19ae50470a7fc5
+      SubnetId: !Ref subnet04c0ddd3224f5f7ac
+  subnetacl2:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      NetworkAclId: !Ref acl0df19ae50470a7fc5
+      SubnetId: !Ref subnet076ea0211f91efde3
+  subnetacl3:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      NetworkAclId: !Ref acl0df19ae50470a7fc5
+      SubnetId: !Ref subnet02eea377d784af8a9
+  subnetacl4:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      NetworkAclId: !Ref acl0df19ae50470a7fc5
+      SubnetId: !Ref subnet089aad5aa0d8ffc2b
+  gw1:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref vpc06df7387e74ce73d7
+      InternetGatewayId: !Ref igw00318af932fad3ea8
+  subnetroute1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref rtb096cf3dc40867e479
+      SubnetId: !Ref subnet076ea0211f91efde3
+  subnetroute2:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref rtb096cf3dc40867e479
+      SubnetId: !Ref subnet089aad5aa0d8ffc2b
+  subnetroute4:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref rtb0d9c64c57f9680ea5
+      SubnetId: !Ref subnet04c0ddd3224f5f7ac
+  subnetroute5:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref rtb0d9c64c57f9680ea5
+      SubnetId: !Ref subnet02eea377d784af8a9
+  route1:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref rtb096cf3dc40867e479
+      GatewayId: !Ref igw00318af932fad3ea8
+    DependsOn: gw1
+  route2:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref rtb0d9c64c57f9680ea5
+  dchpassoc1:
+    Type: 'AWS::EC2::VPCDHCPOptionsAssociation'
+    Properties:
+      VpcId: !Ref vpc06df7387e74ce73d7
+      DhcpOptionsId: !Ref dopt967a43ed
+  ingress1:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref sgVPCWebSG
+      IpProtocol: tcp
+      FromPort: '80'
+      ToPort: '80'
+      SourceSecurityGroupId: !Ref sgVPCELB
+      SourceSecurityGroupOwnerId: '870923552731'
+  ingress2:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref sgVPCWebSG
+      IpProtocol: tcp
+      FromPort: '22'
+      ToPort: '22'
+      CidrIp: 0.0.0.0/0
+  ingress3:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref sgVPCELB
+      IpProtocol: tcp
+      FromPort: '80'
+      ToPort: '80'
+      CidrIp: 0.0.0.0/0
+  ingress4:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref sgVPCELB
+      IpProtocol: tcp
+      FromPort: '22'
+      ToPort: '22'
+      CidrIp: 0.0.0.0/0
+  egress1:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      GroupId: !Ref sgVPCWebSG
+      IpProtocol: '-1'
+      CidrIp: 0.0.0.0/0
+  egress2:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      GroupId: !Ref sgVPCELB
+      IpProtocol: '-1'
+      CidrIp: 0.0.0.0/0
+
