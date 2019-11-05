@@ -33,7 +33,7 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
     Properties:
-      BucketName: testbucket-sftp
+      BucketName: testbucket1-sftp
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -91,8 +91,8 @@ Resources:
     Type: AWS::Transfer::User
     Properties:
       ServerId: !GetAtt SFTPServer.ServerId
-      UserName: john
-      HomeDirectory: !Sub "/${SFTPServerS3Bucket}/home/john"
+      UserName: sftpuser
+      HomeDirectory: !Sub "/${SFTPServerS3Bucket}/home/sftpuser"
       Policy: >
           {
             "Version": "2012-10-17",
