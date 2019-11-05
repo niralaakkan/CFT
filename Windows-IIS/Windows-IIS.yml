@@ -8,19 +8,16 @@ Parameters:
   KeyName:
     Description: Keypair
     Type: 'AWS::EC2::KeyPair::KeyName'
-    ConstraintDescription: 
   SecurityGroupServer:
     Description: Security group id
     Type: 'AWS::EC2::SecurityGroup::Id'
-    ConstraintDescription: 
   mySubnet:
     Description: Subnet id
     Type: 'AWS::EC2::Subnet::Id'
-    ConstraintDescription: 
   InstanceType:
     Description: Amazon EC2 instance type
     Type: String
-    Default: m4.large
+    Default: t2.micro
     AllowedValues:
       - t1.micro
       - t2.micro
@@ -102,16 +99,32 @@ Resources:
             1-install-roles:
               command: >-
                 powershell.exe -ExecutionPolicy Unrestricted
-                Install-WindowsFeature -Name Web-Server -IncludeAllSubFeature
-                -IncludeManagementTool
-            2-install-features:
+                Install-WindowsFeature -Name Web-Server -IncludeAllSubFeature -IncludeManagementTool
+            2-import-module:
               command: >-
                 powershell.exe -ExecutionPolicy Unrestricted
-                Install-WindowsFeature Telnet-Client
-            3-restart:
+                Get-Module -ListAvailable AWSPowershell, WebAdministration | import-module 
+            3-create-directory:
+              command: >-
+                powershell.exe -ExecutionPolicy Unrestricted
+                New-Item -Path "c:\inetpub_1\wwwroot" -ItemType "directory" -force
+                $error | ConvertTo-Html -Head TestSite | Out-File C:\inetpub_1\wwwroot\testsite.html
+            4-Remove-defaults:
+              command: >-
+                powershell.exe -ExecutionPolicy Unrestricted
+                Get-Website -Name "Default Web Site" | Remove-Website -Confirm:$false -Verbose
+                Remove-webapppool -Name "DefaultAppPool" -confirm:$false -verbose
+            5-Configure-site:
+              command: >-
+                powershell.exe -ExecutionPolicy Unrestricted
+                New-WebAppPool testsite -force
+                new-website -Name testsite -Port 80 -IPAddress "*" -PhysicalPath "C:\inetpub_1\wwwroot" -ApplicationPool testsite -force
+                Add-WebConfiguration //defaultDocument/files "IIS:\sites\testsite" -atIndex 0 -Value @{value="testsite.html"} 
+                Start-Website -name testsite
+            6-restart:
               command: powershell.exe Restart-Computer
               waitAfterCompletion: forever
-            4-signal-success:
+            7-signal-success:
               command: !Join 
                 - ''
                 - - cfn-signal.exe -e %ERRORLEVEL% "
@@ -126,8 +139,6 @@ Resources:
                 files:
                   - 'c:\cfn\cfn-hup.conf'
                   - 'c:\cfn\hooks.d\cfn-auto-reloader.conf'
-      'AWS::CloudFormation::Designer':
-        id: 792150ee-262c-40b0-9dfa-f0f823640577
     Properties:
       Tags:
         - Key: Name
@@ -143,22 +154,6 @@ Resources:
           SubnetId: !Ref mySubnet
           GroupSet:
             - !Ref SecurityGroupServer
-      BlockDeviceMappings:
-        - DeviceName: /dev/sda1
-          Ebs:
-            VolumeSize: '100'
-            VolumeType: gp2
-            DeleteOnTermination: 'false'
-        - DeviceName: /dev/xvdf
-          Ebs:
-            VolumeSize: '100'
-            VolumeType: gp2
-            DeleteOnTermination: 'false'
-        - DeviceName: /dev/xvdg
-          Ebs:
-            VolumeSize: '100'
-            VolumeType: gp2
-            DeleteOnTermination: 'false'
       UserData: !Base64 
         'Fn::Join':
           - ''
@@ -170,67 +165,17 @@ Resources:
             - ' --region '
             - !Ref 'AWS::Region'
             - |+
-
             - </script>
   WindowsServerWaitHandle:
     Type: 'AWS::CloudFormation::WaitConditionHandle'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: cac06370-6e41-47c0-aece-96ab11ba3b76
+    
   WindowsServerWaitCondition:
     Type: 'AWS::CloudFormation::WaitCondition'
     DependsOn: WindowsServer
     Properties:
       Handle: !Ref WindowsServerWaitHandle
       Timeout: '3600'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: abd3a9e1-f61a-4e8f-81ad-7eb09da6aa86
 Outputs:
   InstanceID:
     Description: The Instance ID
     Value: !Ref WindowsServer
-Metadata:
-  'AWS::CloudFormation::Designer':
-    cac06370-6e41-47c0-aece-96ab11ba3b76:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 60
-        'y': 90
-      z: 1
-      embeds: []
-    924ac396-6d22-4a8b-9fb9-21a7e323340f:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 180
-        'y': 90
-      z: 1
-      embeds: []
-    792150ee-262c-40b0-9dfa-f0f823640577:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 60
-        'y': 210
-      z: 1
-      embeds: []
-      ismemberof:
-        - 924ac396-6d22-4a8b-9fb9-21a7e323340f
-    abd3a9e1-f61a-4e8f-81ad-7eb09da6aa86:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 180
-        'y': 210
-      z: 1
-      embeds: []
-      references:
-        - cac06370-6e41-47c0-aece-96ab11ba3b76
-      dependson:
-        - 792150ee-262c-40b0-9dfa-f0f823640577

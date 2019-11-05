@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: "This template creates a VPC with 2 private subnet and 2 public subnet.
-Creates IGW, NAT gateway & Bootstraps EC2 instance"
+Creates IGW, NAT gateway & Bootstraps EC2 instance then adds behind the ELB"
 
 Resources:
   vpc06df7387e74ce73d7:
